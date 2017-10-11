@@ -83,7 +83,7 @@ Packages are installed from [https://cran.r-project.org](CRAN) by default using
 # Install all the packages used in this demo
 # note that tidyverse is a metapackage that contains a lot of sub-packages
 # eg. plyr, which i will often refer to by name and load separately
-# install.packages(c("rio", "ggplot2", "R.matlab", "tidyverse", binom))
+# install.packages(c("rio", "ggplot2", "R.matlab", "tidyverse", "binom", "pander", "lme4"))
 
 ```
 
@@ -99,6 +99,8 @@ library("R.matlab")
 library("reshape2")
 library("plyr")
 library("binom")
+library("pander")
+library("lme4")
 
 
 # If this is the first time you have loaded rio, you will be told you are missing some packages. install them too
@@ -193,6 +195,11 @@ Once we have our data in the long format, manipulating it is trivial
 # we use ddply to summarize our data by cell (channel, cluster), amplitude, repetition, and laser on/off
 # first make a cell column that just groups channel and cluster into one column
 laser_data$cell <- paste(laser_data$channel,laser_data$cluster)
+laser_data$cell <- as.factor(laser_data$cell)
+
+# also retype some stuff
+laser_data$amplitude <- as.ordered(laser_data$amplitude)
+laser_data$laser <- as.factor(laser_data$laser)
 
 
 rep_spikes <- ddply(laser_data, .(cell, amplitude, laser, rep), summarize,
@@ -210,6 +217,8 @@ head(spikes)
 spikes_xy <- ddply(rep_spikes, .(cell, amplitude), summarize,
                    mean_laser_spikes = mean(n_spikes[laser==TRUE]),
                    mean_nolaser_spikes = mean(n_spikes[laser==FALSE]))
+
+
 
 ```
 
@@ -295,6 +304,8 @@ g.density
 
 # Stats
 
+## Linear Models
+
 All linear models use `lm` and `glm` (regression, ANOVA, etc.). (see `?lm` and `?glm`).
 
 So, to ANCOVA firing rate by laser and amplitude...
@@ -319,15 +330,28 @@ laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
 
 # Model comparison
 
-anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7)
+pander(anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7))
 
-# summarize the significant ones
-pander::pander(summary(laser.lm3))
-summary(laser.lm6)
-
-
+# summarize one of the significant ones
+pander(summary(laser.lm3))
 
 ```
+
+ggplot also can do its own modeling
+```{r}
+ggplot(rep_spikes, aes(x=as.numeric(amplitude), y=n_spikes, color=cell))+
+  geom_point(position=position_jitter(width=0.25))+
+  geom_smooth(method="lm")
+
+```
+
+and you can plot basic diagnostic stats
+
+```{r}
+plot(laser.lm3)
+```
+
+
 
 `glm` can be used for ... well generalized linear models - so if we wanted to do a logistic regression...
 ```{r}
@@ -336,20 +360,58 @@ gen12 <- gendat[gendat$mouse == "7012",]
 
 # Regress the binomial correct/incorrect responses against the type of generalization
 gen12.lm <- glm(correct ~ gentype2, data=gen12, family="binomial")
-summary(gen12.lm)
+pander(summary(gen12.lm))
 ```
 
+We do generalized linear mixed models with the `lme4` package's `lmer` and `glmer` functions
 
-You can use the `modelr::model_matrix` function to see the equation form of the formula used for the model.
+```{r, cache=TRUE}
+laser.glm1 <- lmer(n_spikes ~ laser + (1+laser|cell), data=rep_spikes)
+summary(laser.glm1)
+
+# We can get the random effect of the laser (the effect of the laser that is specific to the cell) using ranef
+pander(ranef(laser.glm1))
+
+# or for amplitude
+laser.glm2 <- lmer(n_spikes ~ amplitude + (1+amplitude|cell), data=rep_spikes)
+summary(laser.glm2)
+ranef(laser.glm2)
+```
+
+Or with the behavior data 
+```{r}
+# Interaction model - effect of gentype2 allowed to vary by mouse, allow correlation between intercept devs (estimate correlation between intercept devs and gentype devs across mice)
+
+# we would call it like this, but it takes forever to fit so we just load
+# novtypes.lmer4 <- glmer(correct ~ gentype2 + (1 + gentype2|mouse),data=gendat,family=binomial)
+load("/Users/Jonny/GitHub/R_crash_course/data/lmer4.RData", .GlobalEnv)
+summary(novtypes.lmer4)
+pander(ranef(novtypes.lmer4))
+```
+
+## Nonparametric tests
+
+R can also do nonparametric models easily. For example if we wanted to compare firing rates with and without laser for each cell, averaged across amplitudes
 
 ```{r}
-#modelr::model_matrix()
+# Summarize over amplitudes
+spikes_laser <- ddply(rep_spikes, .(cell, laser), summarize,
+                   mean_spikes = mean(n_spikes))
+
+# We spread this data back out because the wilcox
+
+# we used the paired wilcoxon signed-rank test because measurements are paired within cells
+laser_wilcox <- wilcox.test(mean_spikes~laser, data=spikes_laser, paired=TRUE)
+
+# or the friedman.test for treating the data as grouped within cells
+laser_friedman <- friedman.test(mean_spikes~laser|cell, data=spikes_laser)
+
+# another eg.,  a simple sign test on binomial data, here we see if a mouse is performing above chance on a particular day
+
+gen12_session <- gen12[gen12$session==200,]$correct
+binom.test(sum(gen12_session), length(gen12_session), alternative=c("greater"))
 ```
 
-
-
-# firing rate by amplitude within cells
-## ANOVAs, nested analysis, skillings-mac
 
 
 
