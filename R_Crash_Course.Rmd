@@ -322,7 +322,7 @@ laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
 anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7)
 
 # summarize the significant ones
-pander::pandoc.table(summary(laser.lm3))
+pander::pander(summary(laser.lm3))
 summary(laser.lm6)
 
 
