@@ -1,32 +1,314 @@
 ---
 title: "R Crash Course"
 author: "Jonny Saunders"
-date: "9/26/2017"
+date: "10/11/2017"
 output: 
-  html_document:
-    keep_md: true
+  md_document:
+    toc: true
+    toc_depth: 2
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Why R?
+
+* Purpose-built for stats & data analysis - syntax is straightforward, well-implemented, and relatively static
+* R Community - huge amount of centrally hosted, well-designed software with documentation to match. (vs. the nightmarish MATLAB central)
+* Free, Open Source - Important not only for the state and future of computing, but also for open, reproducible science because your code can be run by anyone even if they don't have a MATLAB site license.
+* Typesetting - do your statistics in the same document as your manuscript, never worry about copy and pasting a number wrong.
+* Plotting - ggplot2 makes MATLAB plotting look like crayon playtime
+
+
+# Basic Syntax
+
+R has some familiar and some unfamilar syntax. 
+
+Assignment works using both the `<-` (typical) and `=` operators, they are slightly different but in most cases are interchangeable
+```{r}
+x <- 1
+x
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+Get help with `?`
+```{r}
+?lm
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+The most basic data class, a list, is declared with the `c()` operator. See my lesson on [https://uodatascience.github.io/R_Guide/0201_Objects.html](objects) for more detail. some examples:
+```{r}
+# Vector
+x <- c(1,2,3,4,5,6)
+x
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Indexing uses []
+x[2]
+
+# Matrices (arrays w/ 2 dimensions)
+y <- matrix(1:24, ncol=3, nrow=8)
+y
+
+# A vector can be made an array in a few ways
+matrix(x, nrow=2, ncol=3)
+dim(x) <- c(2,3)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Data frames are one of the main ways of storing data, some examples:
+
+```{r}
+# Pull an existing dataframe for an example
+diamonds <- ggplot2::diamonds # the :: notation accesses a name from a package without loading the package
+
+head(diamonds) # show the first six rows and the header of a dataframe
+
+# Access named columns like this
+diamonds$carat[1:5]
+
+# Logical indexing is similar to MATLAB
+
+diamonds[diamonds$carat >= 5,] 
+
+# The additional comma is because the logical statement selects rows, a blank after a comma selects all the columns. For example, if we just wanted the first column we could
+diamonds[diamonds$carat >= 5,1] 
+
+# or equivalently
+diamonds[diamonds$carat >= 5,]$carat
+```
+
+# Packages
+
+Packages are installed from [https://cran.r-project.org](CRAN) by default using
+
+```{r}
+# install.packages("package_name")
+
+# Install all the packages used in this demo
+# install.packages(c("rio", "ggplot2", "R.matlab"))
+
+```
+
+Installed packaged are loaded into an R session using
+
+```{r}
+#library("package_name")
+
+# for example, load the packages that we'll be using
+library("ggplot2")
+library("rio")
+library("R.matlab")
+library("reshape2")
+library("plyr")
+
+
+# If this is the first time you have loaded rio, you will be told you are missing some packages. install them too
+#install_formats()
+```
+
+# Loading data
+
+The `rio` package's `import` function makes importing other data formats easy, it wraps a bunch of other packages that handle the actual importing. In this case though, since the out files are mega-nested gnarly matlab structures, we have to use `R.matlab`'s more flexible `readMat` function.
+
+We'll load some of Aldis' data, comparing spiking activity in mice injected with archaerhodopsin with and without laser stimulation. Because loading the data using `readMat` takes forever, I'll just leave this here, unevaluated, and used a cached version of that data. This is shitty code, but I'm leaving it all in a for loop so make it linearly readable.
+
+```{r, eval=FALSE}
+
+# Set this to wherever the repo landed on your computer
+laser_folder <- "/Users/jonny/GitHub/R_crash_course/data/laser"
+laser_files <- dir(laser_folder, pattern="outPSTH*")
+
+# Make a blank dataframe with our field names and data types
+laser_data <- data.frame(channel=integer(),
+                         cluster=integer(),
+                         laser=logical(),
+                         amplitude=integer(),
+                         rep=integer(),
+                         spiketime=double())
+
+# loop through out files
+for(f in laser_files){
+  print(f)
+  # Load the file
+  file <- file.path(laser_folder, f)
+  out <- R.matlab::readMat(file)
+  out <- out$out
+  
+  # Get field names for numerical indexing with which()
+  field_names <- names(out[,,1])
+  
+  # Laser off first
+  las_off <- which(field_names == "M1OFF")
+  off <- drop(out[las_off,1,1][[1]]) # Get the M1OFF field, dropping singleton dimensions
+  
+  # A series of manipulation functions that massage the data into into "long" format
+  off <- plyr::adply(off, c(1,2)) # adply usually applies a function, but here we just want it to group values by the first two dimensions of the array (amplitude and trial) and concatenate
+  off <- melt(off, id.vars=c("X1","X2"), na.rm=TRUE) # Now we want to melt this back down so the columns with multiple spike times are flattened to a single column
+  off <- off[,c(1,2,4)] # Subset the dataframe, leaving behind the spike # column
+  
+  # Format dataframe for concatenation
+  names(off) <- c("amplitude", "rep", "spiketime") # rename fields
+  off <- off[order(off$amplitude, off$rep),] # reorder by amp then rep
+  off$amplitude <- as.integer(off$amplitude) # changing types and adding other variables
+  off$rep <- as.integer(off$rep)
+  off$channel <- as.integer(substr(f,11,11))
+  off$cluster <- as.integer(substr(f,13,13))
+  off$laser <- TRUE
+  
+  # then laser on
+  las_on <- which(field_names == "M1ON")
+  on <- drop(out[las_on,1,1][[1]])
+  on <- plyr::adply(on, c(1,2))
+  on <- melt(on, id.vars=c("X1","X2"), na.rm=TRUE)
+  on <- on[,c(1,2,4)]
+  
+  # Format dataframe for concatenation
+  names(on) <- c("amplitude", "rep", "spiketime")
+  on <- on[order(on$amplitude, on$rep),]
+  on$amplitude <- as.integer(on$amplitude)
+  on$rep <- as.integer(on$rep)
+  on$channel <- as.integer(substr(f,11,11))
+  on$cluster <- as.integer(substr(f,13,13))
+  on$laser <- FALSE
+  
+  # Concatenate to dataframe
+  laser_data <- rbind(laser_data, off, on)
+}
+
+save(laser_data,file="/Users/jonny/GitHub/R_crash_course/data/laser.RData")
+```
+
+```{r}
+# Load the laser data to the global environment
+load("/Users/jonny/GitHub/R_crash_course/data/laser.RData", .GlobalEnv)
+
+# Now our data is in the 'long' format
+head(laser_data)
+```
+
+# Manipulating Data
+
+Once we have our data in the long format, manipulating it is trivial
+
+```{r}
+# we use ddply to summarize our data by cell (channel, cluster), amplitude, repetition, and laser on/off
+# first make a cell column that just groups channel and cluster into one column
+laser_data$cell <- paste(laser_data$channel,laser_data$cluster)
+
+
+rep_spikes <- ddply(laser_data, .(cell, amplitude, laser, rep), summarize,
+                    n_spikes = length(spiketime))
+head(rep_spikes)
+
+# Or collapsing across repetitions
+spikes <- ddply(rep_spikes, .(cell, amplitude, laser), summarize,
+                mean_spikes = mean(n_spikes),
+                sd_spikes = sd(n_spikes))
+
+head(spikes)
+
+# Or by laser condition
+spikes_xy <- ddply(rep_spikes, .(cell, amplitude), summarize,
+                   mean_laser_spikes = mean(n_spikes[laser==TRUE]),
+                   mean_nolaser_spikes = mean(n_spikes[laser==FALSE]))
+
+```
+
+# Plots
+
+More detail on plotting can be found in my [https://github.com/uodatascience/ggplot_guide](ggplot guide), but a quick plot shows us what we have
+
+```{r}
+g.spikes_xy <- ggplot(spikes_xy, aes(x=mean_laser_spikes, y=mean_nolaser_spikes, color=cell))+
+  geom_abline(intercept=0, slope=1)+
+  geom_point()+
+  coord_fixed()+
+  theme(legend.position = "none")
+g.spikes_xy
+
+g.spike_ranges <- ggplot(spikes, aes(x=laser, color=as.factor(cell)))+
+  geom_pointrange(aes(y=mean_spikes, ymin=mean_spikes-sd_spikes, ymax=mean_spikes+sd_spikes), size=0.3)+
+  facet_grid(.~amplitude, scales="free")+
+  theme(legend.position = "none")
+g.spike_ranges
+
+
+```
+
+the good ole raster
+
+```{r}
+g.raster <- ggplot(laser_data[laser_data$cell == "0 1",])+
+  geom_point(aes(x=spiketime, y=interaction(rep,laser), color=laser), size=0.5)+
+  facet_grid(amplitude~.)+
+  theme(axis.text.y = element_blank())
+g.raster
+
+g.raster_all <- ggplot(laser_data)+
+  geom_point(aes(x=spiketime, y=interaction(rep,amplitude,laser), color=laser), size=0.1, alpha=0.5)+
+  facet_grid(cell~.)+
+  theme(axis.text.y = element_blank())
+g.raster_all
+
+g.raster_side <- ggplot(laser_data)+
+  geom_point(aes(x=spiketime, y=interaction(rep,amplitude), color=laser), size=0.1, alpha=0.5)+
+  facet_grid(cell~laser)+
+  scale_color_brewer(palette="Set1")+
+  theme(axis.text.y = element_blank())
+g.raster_side 
+
+g.density <- ggplot(laser_data[laser_data$cell == "0 1",], aes(spiketime, ..count.., fill=as.factor(amplitude)))+
+  geom_density(position="fill", color=NA, alpha=0.4)+
+  geom_point(aes(x=spiketime,y=(700-as.numeric(interaction(rep,amplitude)))/700, color=as.factor(amplitude)))+
+  facet_grid(.~laser)+
+  scale_fill_brewer(palette="Set1")+
+  scale_color_brewer(palette="Set1")+
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        plot.background = element_blank(),
+        panel.background = element_rect(fill="gray"),
+        panel.grid = element_blank(),
+        legend.position = "none")
+g.density
+```
+
+
+# Stats
+
+All linear models use `lm` and `glm` (regression, ANOVA, etc.). (see `?lm` and `?glm`).
+
+So, to ANCOVA firing rate by laser and amplitude...
+(note: don't do this, since the spike data is nested within each cell, you can't model the data like this. use summarized (mean) data in that case.)
+
+```{r}
+# Since our amplitude isn't really a number, but it is ordered, we cast it as an ordered factor. lm will run linear-n_levels polynomial contrasts.
+rep_spikes$amplitude <- as.ordered(rep_spikes$amplitude)
+
+# We regress n_spikes on different combinations of predictors using the formula ~ notation
+# Doing hierarchal regression like we should... 
+# First level predictors
+laser.lm1 <- lm(n_spikes ~ as.factor(laser), data=rep_spikes)
+laser.lm2 <- lm(n_spikes ~ amplitude, data=rep_spikes)
+laser.lm3 <- lm(n_spikes ~ cell, data=rep_spikes)
+
+# Second level predictors
+laser.lm4 <- lm(n_spikes ~ as.factor(laser) + amplitude + cell, data=rep_spikes) # Multiple regressors
+laser.lm5 <- lm(n_spikes ~ as.factor(laser) * amplitude + cell, data=rep_spikes) # Multiple regressors with interaction
+laser.lm6 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
+laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
+
+# Model comparison
+anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7)
+
+# summarize the significant ones
+summary(laser.lm3)
+summary(laser.lm6)
+
+
+
+```
+
+```
+
+
+# firing rate by amplitude within cells
+## ANOVAs, nested analysis, skillings-mac
+
+
+
