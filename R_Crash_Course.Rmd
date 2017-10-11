@@ -33,7 +33,7 @@ Get help with `?`
 ```
 
 
-The most basic data class, a list, is declared with the `c()` operator. See my lesson on [https://uodatascience.github.io/R_Guide/0201_Objects.html](objects) for more detail. some examples:
+The most basic data class, a list, is declared with the `c()` operator. See my lesson on [objects](https://uodatascience.github.io/R_Guide/0201_Objects.html) for more detail. some examples:
 ```{r}
 # Vector
 x <- c(1,2,3,4,5,6)
@@ -81,7 +81,9 @@ Packages are installed from [https://cran.r-project.org](CRAN) by default using
 # install.packages("package_name")
 
 # Install all the packages used in this demo
-# install.packages(c("rio", "ggplot2", "R.matlab"))
+# note that tidyverse is a metapackage that contains a lot of sub-packages
+# eg. plyr, which i will often refer to by name and load separately
+# install.packages(c("rio", "ggplot2", "R.matlab", "tidyverse", binom))
 
 ```
 
@@ -96,6 +98,7 @@ library("rio")
 library("R.matlab")
 library("reshape2")
 library("plyr")
+library("binom")
 
 
 # If this is the first time you have loaded rio, you will be told you are missing some packages. install them too
@@ -106,7 +109,7 @@ library("plyr")
 
 The `rio` package's `import` function makes importing other data formats easy, it wraps a bunch of other packages that handle the actual importing. In this case though, since the out files are mega-nested gnarly matlab structures, we have to use `R.matlab`'s more flexible `readMat` function.
 
-We'll load some of Aldis' data, comparing spiking activity in mice injected with archaerhodopsin with and without laser stimulation. Because loading the data using `readMat` takes forever, I'll just leave this here, unevaluated, and used a cached version of that data. This is shitty code, but I'm leaving it all in a for loop so make it linearly readable.
+We'll load some of Aldis' data, comparing spiking activity in mice injected with halorhodopsin with and without laser stimulation. Because loading the data using `readMat` takes forever, I'll just leave this here, unevaluated, and used a cached version of that data. This is shitty code, but I'm leaving it all in a for loop so make it linearly readable.
 
 ```{r, eval=FALSE}
 
@@ -210,6 +213,27 @@ spikes_xy <- ddply(rep_spikes, .(cell, amplitude), summarize,
 
 ```
 
+Some examples from my behavior data
+```{r}
+load("/Users/jonny/GitHub/R_crash_course/data/gendat.RData", .GlobalEnv)
+
+head(gendat)
+
+gendat.mouse_type <- ddply(gendat,.(mouse,gentype2),plyr::summarize, 
+                      meancx   = mean(correct),
+                      meanresp = mean(response),
+                      meantarg = mean(target),
+                      cilo     = 
+                        binom.confint(sum(correct),length(correct),conf.level=0.95,method="exact")[[5]],
+                      cihi     =
+                        binom.confint(sum(correct),length(correct),conf.level=0.95,method="exact")[[6]],
+                      nobs     = length(correct))
+
+head(gendat.mouse_type)
+
+```
+
+
 # Plots
 
 More detail on plotting can be found in my [https://github.com/uodatascience/ggplot_guide](ggplot guide), but a quick plot shows us what we have
@@ -294,17 +318,34 @@ laser.lm6 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
 laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
 
 # Model comparison
+
 anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7)
 
 # summarize the significant ones
-summary(laser.lm3)
+pander::pandoc.table(summary(laser.lm3))
 summary(laser.lm6)
 
 
 
 ```
 
+`glm` can be used for ... well generalized linear models - so if we wanted to do a logistic regression...
+```{r}
+# Subset generalization data to just the best mouse
+gen12 <- gendat[gendat$mouse == "7012",]
+
+# Regress the binomial correct/incorrect responses against the type of generalization
+gen12.lm <- glm(correct ~ gentype2, data=gen12, family="binomial")
+summary(gen12.lm)
 ```
+
+
+You can use the `modelr::model_matrix` function to see the equation form of the formula used for the model.
+
+```{r}
+#modelr::model_matrix()
+```
+
 
 
 # firing rate by amplitude within cells
