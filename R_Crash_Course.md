@@ -312,7 +312,7 @@ Once we have our data in the long format, manipulating it is trivial
                        mean_laser_spikes = mean(n_spikes[laser==TRUE]),
                        mean_nolaser_spikes = mean(n_spikes[laser==FALSE]))
 
-Some examples from my behavior data
+An example from my behavior data
 
     load("/Users/jonny/GitHub/R_crash_course/data/gendat.RData", .GlobalEnv)
 
@@ -397,6 +397,7 @@ the good ole raster
     g.raster_all <- ggplot(laser_data)+
       geom_point(aes(x=spiketime, y=interaction(rep,amplitude,laser), color=laser), size=0.1, alpha=0.5)+
       facet_grid(cell~.)+
+      scale_color_brewer(palette="Set1")+
       theme(axis.text.y = element_blank())
     g.raster_all
 
@@ -453,12 +454,13 @@ the data like this. use summarized (mean) data in that case.)
     # Second level predictors
     laser.lm4 <- lm(n_spikes ~ as.factor(laser) + amplitude + cell, data=rep_spikes) # Multiple regressors
     laser.lm5 <- lm(n_spikes ~ as.factor(laser) * amplitude + cell, data=rep_spikes) # Multiple regressors with interaction
-    laser.lm6 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
-    laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
+    laser.lm6 <- lm(n_spikes ~ as.factor(laser) * cell + amplitude, data=rep_spikes)
+    laser.lm7 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
+    laser.lm8 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
 
     # Model comparison
 
-    pander(anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7))
+    pander(anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7, laser.lm8))
 
 <table style="width:78%;">
 <caption>Analysis of Variance Table</caption>
@@ -522,14 +524,22 @@ the data like this. use summarized (mean) data in that case.)
 <td align="center">0.2852</td>
 </tr>
 <tr class="even">
-<td align="center">16293</td>
-<td align="center">68091</td>
-<td align="center">90</td>
-<td align="center">901.5</td>
-<td align="center">2.395</td>
-<td align="center">3.385e-12</td>
+<td align="center">16373</td>
+<td align="center">68948</td>
+<td align="center">10</td>
+<td align="center">44.41</td>
+<td align="center">1.062</td>
+<td align="center">0.388</td>
 </tr>
 <tr class="odd">
+<td align="center">16293</td>
+<td align="center">68091</td>
+<td align="center">80</td>
+<td align="center">857.1</td>
+<td align="center">2.562</td>
+<td align="center">8.159e-13</td>
+</tr>
+<tr class="even">
 <td align="center">16175</td>
 <td align="center">67639</td>
 <td align="center">118</td>
@@ -1005,46 +1015,276 @@ and `glmer` functions
     ## amplitude^5  0.657 -0.524 -0.143  0.231  0.011       
     ## amplitude^6 -0.069  0.048  0.015  0.123 -0.077  0.017
 
-    ranef(laser.glm2)
+    pander(ranef(laser.glm2))
 
-    ## $cell
-    ##     (Intercept)  amplitude.L  amplitude.Q amplitude.C   amplitude^4
-    ## 0 1 -1.60342217  0.167298832  0.036994443 -0.01277981 -0.0173447324
-    ## 0 2  6.83284873 -0.556905153  0.247739432  0.61877784 -0.2110970054
-    ## 0 3  0.05870812 -0.067629132  0.012767397  0.10385512 -0.0193638252
-    ## 1 1 -0.10943224 -0.155312225 -0.428069915 -0.28266193  0.1748126788
-    ## 2 1  3.05107849 -0.657738352 -0.464015875 -0.32493363  0.2960151619
-    ## 3 1 -1.15618378  0.088326970 -0.005509343 -0.02571456  0.0057690844
-    ## 4 1 -1.11189407  0.015817799 -0.104167707 -0.08922725  0.0566734058
-    ## 4 2  0.56104821  0.097264391  0.222377596  0.22032562 -0.1375060462
-    ## 5 1 -0.09395990  0.307959350  0.350813707  0.12119455 -0.1581301595
-    ## 5 2  0.66624809  0.224950923  0.127807932 -0.09270990 -0.0582727474
-    ## 5 3 -1.39396533  0.142451718  0.024067677 -0.04730374  0.0005422835
-    ## 6 1 -1.13322194  0.128801810  0.014353818 -0.03099774 -0.0070332842
-    ## 6 2 -0.87254380  0.051663707 -0.036876724 -0.08518466  0.0362932048
-    ## 7 1 -0.10124796  0.050328342  0.152115311  0.05648254 -0.0396356580
-    ## 7 2 -1.25167280 -0.002554223 -0.091889796 -0.08455215  0.0642785972
-    ## 7 3 -1.12342378  0.098422750 -0.007981844 -0.02897206  0.0028203105
-    ## 7 4 -1.21896387  0.066852493 -0.050526111 -0.01559822  0.0111787315
-    ##     amplitude^5  amplitude^6
-    ## 0 1 -0.12542872  0.024663765
-    ## 0 2  0.56144913  0.013877804
-    ## 0 3  0.04039843  0.029320737
-    ## 1 1  0.09910557  0.008005537
-    ## 2 1  0.29478639 -0.104453283
-    ## 3 1 -0.08075295  0.017515390
-    ## 4 1 -0.05334090  0.014263157
-    ## 4 2  0.01262104  0.022421112
-    ## 5 1 -0.13751381 -0.026309965
-    ## 5 2 -0.06215773 -0.060615021
-    ## 5 3 -0.12027665  0.008658041
-    ## 6 1 -0.09157266  0.013665382
-    ## 6 2 -0.07183775 -0.005166820
-    ## 7 1 -0.06313940 -0.020110063
-    ## 7 2 -0.06717649  0.011355019
-    ## 7 3 -0.07856351  0.017928225
-    ## 7 4 -0.05659999  0.034980984
+    ## Warning in pander.default(ranef(laser.glm2)): No pander.method for
+    ## "ranef.mer", reverting to default.
 
+-   **cell**:
+
+    <table>
+    <caption>Table continues below</caption>
+    <colgroup>
+    <col width="12%" />
+    <col width="17%" />
+    <col width="17%" />
+    <col width="17%" />
+    <col width="17%" />
+    <col width="17%" />
+    </colgroup>
+    <thead>
+    <tr class="header">
+    <th align="center"> </th>
+    <th align="center">(Intercept)</th>
+    <th align="center">amplitude.L</th>
+    <th align="center">amplitude.Q</th>
+    <th align="center">amplitude.C</th>
+    <th align="center">amplitude^4</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="odd">
+    <td align="center"><strong>0 1</strong></td>
+    <td align="center">-1.603</td>
+    <td align="center">0.1673</td>
+    <td align="center">0.03699</td>
+    <td align="center">-0.01278</td>
+    <td align="center">-0.01734</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>0 2</strong></td>
+    <td align="center">6.833</td>
+    <td align="center">-0.5569</td>
+    <td align="center">0.2477</td>
+    <td align="center">0.6188</td>
+    <td align="center">-0.2111</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>0 3</strong></td>
+    <td align="center">0.05871</td>
+    <td align="center">-0.06763</td>
+    <td align="center">0.01277</td>
+    <td align="center">0.1039</td>
+    <td align="center">-0.01936</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>1 1</strong></td>
+    <td align="center">-0.1094</td>
+    <td align="center">-0.1553</td>
+    <td align="center">-0.4281</td>
+    <td align="center">-0.2827</td>
+    <td align="center">0.1748</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>2 1</strong></td>
+    <td align="center">3.051</td>
+    <td align="center">-0.6577</td>
+    <td align="center">-0.464</td>
+    <td align="center">-0.3249</td>
+    <td align="center">0.296</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>3 1</strong></td>
+    <td align="center">-1.156</td>
+    <td align="center">0.08833</td>
+    <td align="center">-0.005509</td>
+    <td align="center">-0.02571</td>
+    <td align="center">0.005769</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>4 1</strong></td>
+    <td align="center">-1.112</td>
+    <td align="center">0.01582</td>
+    <td align="center">-0.1042</td>
+    <td align="center">-0.08923</td>
+    <td align="center">0.05667</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>4 2</strong></td>
+    <td align="center">0.561</td>
+    <td align="center">0.09726</td>
+    <td align="center">0.2224</td>
+    <td align="center">0.2203</td>
+    <td align="center">-0.1375</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>5 1</strong></td>
+    <td align="center">-0.09396</td>
+    <td align="center">0.308</td>
+    <td align="center">0.3508</td>
+    <td align="center">0.1212</td>
+    <td align="center">-0.1581</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>5 2</strong></td>
+    <td align="center">0.6662</td>
+    <td align="center">0.225</td>
+    <td align="center">0.1278</td>
+    <td align="center">-0.09271</td>
+    <td align="center">-0.05827</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>5 3</strong></td>
+    <td align="center">-1.394</td>
+    <td align="center">0.1425</td>
+    <td align="center">0.02407</td>
+    <td align="center">-0.0473</td>
+    <td align="center">0.0005423</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>6 1</strong></td>
+    <td align="center">-1.133</td>
+    <td align="center">0.1288</td>
+    <td align="center">0.01435</td>
+    <td align="center">-0.031</td>
+    <td align="center">-0.007033</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>6 2</strong></td>
+    <td align="center">-0.8725</td>
+    <td align="center">0.05166</td>
+    <td align="center">-0.03688</td>
+    <td align="center">-0.08518</td>
+    <td align="center">0.03629</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>7 1</strong></td>
+    <td align="center">-0.1012</td>
+    <td align="center">0.05033</td>
+    <td align="center">0.1521</td>
+    <td align="center">0.05648</td>
+    <td align="center">-0.03964</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>7 2</strong></td>
+    <td align="center">-1.252</td>
+    <td align="center">-0.002554</td>
+    <td align="center">-0.09189</td>
+    <td align="center">-0.08455</td>
+    <td align="center">0.06428</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>7 3</strong></td>
+    <td align="center">-1.123</td>
+    <td align="center">0.09842</td>
+    <td align="center">-0.007982</td>
+    <td align="center">-0.02897</td>
+    <td align="center">0.00282</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>7 4</strong></td>
+    <td align="center">-1.219</td>
+    <td align="center">0.06685</td>
+    <td align="center">-0.05053</td>
+    <td align="center">-0.0156</td>
+    <td align="center">0.01118</td>
+    </tr>
+    </tbody>
+    </table>
+
+    <table style="width:53%;">
+    <colgroup>
+    <col width="13%" />
+    <col width="19%" />
+    <col width="19%" />
+    </colgroup>
+    <thead>
+    <tr class="header">
+    <th align="center"> </th>
+    <th align="center">amplitude^5</th>
+    <th align="center">amplitude^6</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="odd">
+    <td align="center"><strong>0 1</strong></td>
+    <td align="center">-0.1254</td>
+    <td align="center">0.02466</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>0 2</strong></td>
+    <td align="center">0.5614</td>
+    <td align="center">0.01388</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>0 3</strong></td>
+    <td align="center">0.0404</td>
+    <td align="center">0.02932</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>1 1</strong></td>
+    <td align="center">0.09911</td>
+    <td align="center">0.008006</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>2 1</strong></td>
+    <td align="center">0.2948</td>
+    <td align="center">-0.1045</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>3 1</strong></td>
+    <td align="center">-0.08075</td>
+    <td align="center">0.01752</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>4 1</strong></td>
+    <td align="center">-0.05334</td>
+    <td align="center">0.01426</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>4 2</strong></td>
+    <td align="center">0.01262</td>
+    <td align="center">0.02242</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>5 1</strong></td>
+    <td align="center">-0.1375</td>
+    <td align="center">-0.02631</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>5 2</strong></td>
+    <td align="center">-0.06216</td>
+    <td align="center">-0.06062</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>5 3</strong></td>
+    <td align="center">-0.1203</td>
+    <td align="center">0.008658</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>6 1</strong></td>
+    <td align="center">-0.09157</td>
+    <td align="center">0.01367</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>6 2</strong></td>
+    <td align="center">-0.07184</td>
+    <td align="center">-0.005167</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>7 1</strong></td>
+    <td align="center">-0.06314</td>
+    <td align="center">-0.02011</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>7 2</strong></td>
+    <td align="center">-0.06718</td>
+    <td align="center">0.01136</td>
+    </tr>
+    <tr class="even">
+    <td align="center"><strong>7 3</strong></td>
+    <td align="center">-0.07856</td>
+    <td align="center">0.01793</td>
+    </tr>
+    <tr class="odd">
+    <td align="center"><strong>7 4</strong></td>
+    <td align="center">-0.0566</td>
+    <td align="center">0.03498</td>
+    </tr>
+    </tbody>
+    </table>
+
+<!-- end of list -->
 Or with the behavior data
 
     # Interaction model - effect of gentype2 allowed to vary by mouse, allow correlation between intercept devs (estimate correlation between intercept devs and gentype devs across mice)

@@ -222,7 +222,7 @@ spikes_xy <- ddply(rep_spikes, .(cell, amplitude), summarize,
 
 ```
 
-Some examples from my behavior data
+An example from my behavior data
 ```{r}
 load("/Users/jonny/GitHub/R_crash_course/data/gendat.RData", .GlobalEnv)
 
@@ -276,6 +276,7 @@ g.raster
 g.raster_all <- ggplot(laser_data)+
   geom_point(aes(x=spiketime, y=interaction(rep,amplitude,laser), color=laser), size=0.1, alpha=0.5)+
   facet_grid(cell~.)+
+  scale_color_brewer(palette="Set1")+
   theme(axis.text.y = element_blank())
 g.raster_all
 
@@ -325,12 +326,13 @@ laser.lm3 <- lm(n_spikes ~ cell, data=rep_spikes)
 # Second level predictors
 laser.lm4 <- lm(n_spikes ~ as.factor(laser) + amplitude + cell, data=rep_spikes) # Multiple regressors
 laser.lm5 <- lm(n_spikes ~ as.factor(laser) * amplitude + cell, data=rep_spikes) # Multiple regressors with interaction
-laser.lm6 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
-laser.lm7 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
+laser.lm6 <- lm(n_spikes ~ as.factor(laser) * cell + amplitude, data=rep_spikes)
+laser.lm7 <- lm(n_spikes ~ as.factor(laser) + amplitude * cell, data=rep_spikes)
+laser.lm8 <- lm(n_spikes ~ as.factor(laser) * amplitude * cell, data=rep_spikes)
 
 # Model comparison
 
-pander(anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7))
+pander(anova(laser.lm1, laser.lm2, laser.lm3, laser.lm4, laser.lm5, laser.lm6, laser.lm7, laser.lm8))
 
 # summarize one of the significant ones
 pander(summary(laser.lm3))
@@ -375,7 +377,7 @@ pander(ranef(laser.glm1))
 # or for amplitude
 laser.glm2 <- lmer(n_spikes ~ amplitude + (1+amplitude|cell), data=rep_spikes)
 summary(laser.glm2)
-ranef(laser.glm2)
+pander(ranef(laser.glm2))
 ```
 
 Or with the behavior data 
